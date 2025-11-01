@@ -1,0 +1,16 @@
+{
+  "users": {
+    "718853742": {
+      "balance": 1000,
+      "last_bonus": 0.0,
+      "banned": false,
+      "frozen": false,
+      "wins": 0,
+      "losses": 0,
+      "games_played": 1
+    }
+  },
+  "meta": {
+    "created": 1762032460.382342
+  }
+}
