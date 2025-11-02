@@ -493,59 +493,67 @@ def admin_status_action(m: types.Message, action: str):
     if m.from_user.id not in ADMINS:
         return
     if not (m.text or "").strip().isdigit():
-    if not (m.text or "").strip().isdigit():
         return bot.send_message(m.chat.id, "Неверный ID.")
     target = int(m.text.strip())
     ensure_user(str(target))
+
     if action == "ban":
         data["users"][str(target)]["banned"] = True
         save_data()
         bot.send_message(m.chat.id, f"🚫 Пользователь {target} забанен.")
         log_action(f"{m.from_user.id} banned {target}")
+
     elif action == "unban":
         data["users"][str(target)]["banned"] = False
         save_data()
         bot.send_message(m.chat.id, f"✅ Пользователь {target} разбанен.")
         log_action(f"{m.from_user.id} unbanned {target}")
+
     elif action == "freeze":
         data["users"][str(target)]["frozen"] = True
         save_data()
         bot.send_message(m.chat.id, f"❄️ Пользователь {target} заморожен.")
         log_action(f"{m.from_user.id} frozen {target}")
+
     elif action == "unfreeze":
         data["users"][str(target)]["frozen"] = False
         save_data()
         bot.send_message(m.chat.id, f"✅ Пользователь {target} разморожен.")
         log_action(f"{m.from_user.id} unfroze {target}")
+
     elif action == "warn":
-        data["users"][str(target)].setdefault("warns",0)
+        data["users"][str(target)].setdefault("warns", 0)
         data["users"][str(target)]["warns"] += 1
         save_data()
         bot.send_message(m.chat.id, f"⚠️ Предупреждение пользователю {target}.")
         log_action(f"{m.from_user.id} warned {target}")
+
     elif action == "reset":
         data["users"][str(target)]["balance"] = 0
         save_data()
         bot.send_message(m.chat.id, f"♻️ Баланс пользователя {target} обнулён.")
         log_action(f"{m.from_user.id} reset {target}")
+
     elif action == "export":
         save_data()
         try:
             bot.send_document(m.chat.id, open(DATA_FILE, "rb"))
         except Exception as e:
             bot.send_message(m.chat.id, f"Ошибка экспорта: {e}")
+
     elif action == "logs":
         try:
             if os.path.exists(LOG_FILE):
                 with open(LOG_FILE, "r", encoding="utf-8") as f:
                     logs = json.load(f)
                 items = list(logs.items())[-50:]
-                text = "\n".join([f"{k}: {v['time']} — {v['action']}" for k,v in items])
+                text = "\n".join([f"{k}: {v['time']} — {v['action']}" for k, v in items])
                 bot.send_message(m.chat.id, f"📜 Логи:\n\n{text}")
             else:
                 bot.send_message(m.chat.id, "Логов нет.")
         except Exception as e:
             bot.send_message(m.chat.id, f"Ошибка чтения логов: {e}")
+
     elif action == "balance":
         bal = get_balance(target)
         bot.send_message(m.chat.id, f"💰 Баланс {target}: {bal} фишек.")
@@ -553,6 +561,7 @@ def admin_status_action(m: types.Message, action: str):
 
     else:
         bot.send_message(m.chat.id, "Неизвестное действие.")
+
 
 # ====== ЗАПУСК ======
 if __name__ == "__main__":
