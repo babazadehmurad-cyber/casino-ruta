@@ -493,7 +493,7 @@ def admin_status_action(m: types.Message, action: str):
     if m.from_user.id not in ADMINS:
         return
     if not (m.text or "").strip().isdigit():
-   if not (m.text or "").strip().isdigit():
+    if not (m.text or "").strip().isdigit():
         return bot.send_message(m.chat.id, "Неверный ID.")
     target = int(m.text.strip())
     ensure_user(str(target))
