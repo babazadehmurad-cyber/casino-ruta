@@ -547,7 +547,10 @@ def admin_status_action(m: types.Message, action: str):
         except Exception as e:
             bot.send_message(m.chat.id, f"Ошибка чтения логов: {e}")
     elif action == "balance":
-        bot.send_message(m.chat.id, f"Баланс {target}: {get_balance(target)}")
+        bal = get_balance(target)
+        bot.send_message(m.chat.id, f"💰 Баланс {target}: {bal} фишек.")
+        log_action(f"Admin {m.from_user.id} checked balance {target}")
+
     else:
         bot.send_message(m.chat.id, "Неизвестное действие.")
 
