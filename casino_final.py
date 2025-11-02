@@ -1,6 +1,7 @@
 import json
 import telebot
 import random
+import os
 import time
 from telebot import types
 
@@ -21,27 +22,36 @@ if "users" not in data:
     data["users"] = {}
 
 # ========== ФУНКЦИИ ==========
-def save_data():
-    with open("data.json", "w") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+DATA_FILE = "data.json"
 
-def ensure_user(uid, username=None):
-    uid = str(uid)
-    if uid not in data["users"]:
-        data["users"][uid] = {"balance": 1000, "bonus_time": 0, "username": username}
-    else:
-        if username:
-            data["users"][uid]["username"] = username
-    save_data()
+def load_data():
+    if not os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "w") as f:
+            json.dump({"users": {}}, f)
+    with open(DATA_FILE, "r") as f:
+        return json.load(f)
 
-def get_balance(uid):
-    ensure_user(uid)
-    return data["users"][str(uid)]["balance"]
+def save_data(data):
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f, indent=4)
 
-def change_balance(uid, amount):
-    ensure_user(uid)
-    data["users"][str(uid)]["balance"] += amount
-    save_data()
+def ensure_user(user_id):
+    data = load_data()
+    if str(user_id) not in data["users"]:
+        data["users"][str(user_id)] = {"balance": 1000, "frozen": False, "banned": False}
+        save_data(data)
+    return data
+
+def get_balance(user_id):
+    data = load_data()
+    ensure_user(user_id)
+    return data["users"][str(user_id)]["balance"]
+
+def change_balance(user_id, amount):
+    data = load_data()
+    ensure_user(user_id)
+    data["users"][str(user_id)]["balance"] += amount
+    save_data(data)
 
 # ========== КНОПКИ ==========
 def main_menu():
