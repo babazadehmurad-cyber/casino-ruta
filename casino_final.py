@@ -4,6 +4,8 @@ import random
 import time
 from telebot import types
 
+MIN_BET = 50  # минимальная ставка
+
 # ========== НАСТРОЙКИ ==========
 TOKEN = "8509920661:AAF5-5hflC_ELoypc_By1HTOg3fgDXs8V1A"
 bot = telebot.TeleBot(TOKEN)
@@ -162,7 +164,7 @@ def roulette_start(m: types.Message):
     # проверка баланса/статуса (предполагается, что есть can_play, ensure_user)
     ensure_user(uid)
     ok, reason = can_play(uid)
-    if not ok:
+    if not ok
         bot.send_message(m.chat.id, reason)
         return
 
@@ -402,111 +404,177 @@ def greet_new_member(m):
         )
         bot.send_message(m.chat.id, text)
 
-# ========================= 👑 АДМИН ПАНЕЛЬ =========================
-ADMINS = [718853742, 8509920661]  # ← ТУТ твои Telegram ID (можно добавить ещё через запятую)
+# ------------------ Админ-панель (исправленная) ------------------
+ADMINS = [718853742]  # <-- добавь сюда ID админов
 
-LOG_FILE = "logs.json"
+LOG_FILE = "admin_logs.json"
 
-def log_action(action):
-    data = load_data()
-    logs = {}
-    if os.path.exists(LOG_FILE):
-        with open(LOG_FILE, "r", encoding="utf-8") as f:
-            try:
-                logs = json.load(f)
-            except:
-                logs = {}
-    logs[str(len(logs) + 1)] = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "action": action}
-    with open(LOG_FILE, "w", encoding="utf-8") as f:
-        json.dump(logs, f, ensure_ascii=False, indent=2)
-
-
-@bot.message_handler(commands=["admin"])
-def admin_panel(m: types.Message):
-    if m.from_user.id not in ADMINS:
-        return bot.send_message(m.chat.id, "🚫 У вас нет доступа.")
-
-    markup = types.InlineKeyboardMarkup()
-    markup.add(
-        types.InlineKeyboardButton("🔒 Забанить", callback_data="admin_ban"),
-        types.InlineKeyboardButton("🔓 Разбанить", callback_data="admin_unban"),
-    )
-    markup.add(
-        types.InlineKeyboardButton("❄️ Заморозить", callback_data="admin_freeze"),
-        types.InlineKeyboardButton("⚠️ Предупредить", callback_data="admin_warn"),
-    )
-    markup.add(types.InlineKeyboardButton("📜 Логи", callback_data="admin_logs"))
-    markup.add(types.InlineKeyboardButton("💰 Баланс по ID", callback_data="admin_balance"))
-
-    bot.send_message(m.chat.id, "👑 Панель администратора", reply_markup=markup)
-
-
-@bot.callback_query_handler(func=lambda c: c.data.startswith("admin_"))
-def admin_action(call):
-    action = call.data.split("_")[1]
-    msg = bot.send_message(call.message.chat.id, f"Введите ID пользователя для '{action}'")
-    bot.register_next_step_handler(msg, lambda m: process_admin_action(m, action))
-
-
-def process_admin_action(m, action):
+def log_action(action: str):
     try:
-        uid = int(m.text)
-    except:
-        bot.send_message(m.chat.id, "⚠️ Введите корректный числовой ID.")
-        return
-
-    data = load_data()
-
-    if action == "ban":
-        data["users"].setdefault(str(uid), {})["banned"] = True
-        save_data()
-        bot.send_message(m.chat.id, f"🚫 Пользователь {uid} забанен.")
-        log_action(f"Админ {m.from_user.id} забанил {uid}")
-
-    elif action == "unban":
-        if str(uid) in data["users"]:
-            data["users"][str(uid)]["banned"] = False
-            save_data()
-            bot.send_message(m.chat.id, f"✅ Пользователь {uid} разбанен.")
-            log_action(f"Админ {m.from_user.id} разбанил {uid}")
-
-    elif action == "freeze":
-        data["users"].setdefault(str(uid), {})["frozen"] = True
-        save_data()
-        bot.send_message(m.chat.id, f"❄️ Пользователь {uid} заморожен.")
-        log_action(f"Админ {m.from_user.id} заморозил {uid}")
-
-    elif action == "warn":
-        data["users"].setdefault(str(uid), {}).setdefault("warns", 0)
-        data["users"][str(uid)]["warns"] += 1
-        save_data()
-        warns = data["users"][str(uid)]["warns"]
-        bot.send_message(m.chat.id, f"⚠️ Предупреждение выдано пользователю {uid}. Всего: {warns}")
-        log_action(f"Админ {m.from_user.id} выдал предупреждение {uid}")
-
-    elif action == "logs":
+        logs = {}
         if os.path.exists(LOG_FILE):
             with open(LOG_FILE, "r", encoding="utf-8") as f:
                 logs = json.load(f)
-            text = "\n".join([f"{v['time']}: {v['action']}" for v in logs.values()[-10:]])
-            bot.send_message(m.chat.id, f"📜 Последние логи:\n{text}")
-        else:
-            bot.send_message(m.chat.id, "📁 Логи пока пусты.")
+        idx = str(len(logs) + 1)
+        logs[idx] = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "action": action}
+        with open(LOG_FILE, "w", encoding="utf-8") as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        # не ломаем бота из-за логов
+        print("Log error:", e)
+
+# Команда /admin — показать панель
+@bot.message_handler(commands=["admin"])
+def admin_panel_cmd(m):
+    if m.from_user.id not in ADMINS:
+        return bot.send_message(m.chat.id, "🚫 У вас нет доступа в админ-панель.")
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        types.InlineKeyboardButton("➕ Начислить", callback_data="adm_add"),
+        types.InlineKeyboardButton("➖ Снять", callback_data="adm_remove"),
+        types.InlineKeyboardButton("🚫 Бан", callback_data="adm_ban"),
+        types.InlineKeyboardButton("✅ Разбан", callback_data="adm_unban"),
+        types.InlineKeyboardButton("❄️ Заморозить", callback_data="adm_freeze"),
+        types.InlineKeyboardButton("🔥 Разморозить", callback_data="adm_unfreeze"),
+        types.InlineKeyboardButton("⚠️ Предупредить", callback_data="adm_warn"),
+        types.InlineKeyboardButton("♻️ Обнулить", callback_data="adm_reset"),
+        types.InlineKeyboardButton("📁 Экспорт (json)", callback_data="adm_export"),
+        types.InlineKeyboardButton("📜 Логи", callback_data="adm_logs"),
+        types.InlineKeyboardButton("💰 Баланс по ID", callback_data="adm_balance"),
+    )
+    bot.send_message(m.chat.id, "👑 Админ-панель:", reply_markup=kb)
+
+# Когда админ нажал кнопку — спросим нужные данные
+@bot.callback_query_handler(func=lambda c: c.data and c.data.startswith("adm_"))
+def on_admin_cb(call: types.CallbackQuery):
+    if call.from_user.id not in ADMINS:
+        bot.answer_callback_query(call.id, "Нет доступа", show_alert=True)
+        return
+    action = call.data.split("_",1)[1]  # e.g. "add", "ban", ...
+    bot.answer_callback_query(call.id)
+    # Спрашиваем у админа данные в зависимости от действия
+    if action in ("add","remove"):
+        msg = bot.send_message(call.message.chat.id, "Введите: <user_id> <amount> (пример: 12345678 500)")
+        bot.register_next_step_handler(msg, admin_handle_add_remove, action)
+    elif action in ("ban","unban","freeze","unfreeze","warn","reset","balance"):
+        msg = bot.send_message(call.message.chat.id, "Введите ID пользователя (например: 12345678):")
+        bot.register_next_step_handler(msg, admin_handle_id_action, action)
+    elif action == "export":
+        # просто отправляем файл данных
+        try:
+            save_data()  # если такая функция есть — обновим файл
+        except:
+            pass
+        try:
+            bot.send_document(call.message.chat.id, open(DATA_FILE, "rb"))
+        except Exception as e:
+            bot.send_message(call.message.chat.id, f"Ошибка экспорта: {e}")
+    elif action == "logs":
+        # выведем последние 30 строк логов, если есть
+        try:
+            if os.path.exists(LOG_FILE):
+                with open(LOG_FILE, "r", encoding="utf-8") as f:
+                    logs = json.load(f)
+                items = list(logs.items())[-30:]
+                text = "\n".join([f"{k}: {v['time']} — {v['action']}" for k,v in items])
+                bot.send_message(call.message.chat.id, f"📜 Логи (последние):\n\n{text}")
+            else:
+                bot.send_message(call.message.chat.id, "📁 Логи пусты.")
+        except Exception as e:
+            bot.send_message(call.message.chat.id, f"Ошибка чтения логов: {e}")
+
+# Обработчик для действий, где требуется "<id> <amount>"
+def admin_handle_add_remove(m: types.Message, action: str):
+    # защита: проверяем, что тот кто ввёл — админ
+    if m.from_user.id not in ADMINS:
+        return bot.send_message(m.chat.id, "🚫 Нет доступа.")
+    parts = (m.text or "").strip().split()
+    if len(parts) != 2 or not parts[0].isdigit() or not parts[1].lstrip("-").isdigit():
+        return bot.send_message(m.chat.id, "Неверный формат. Введите: <user_id> <amount> (пример: 12345678 500)")
+    target = int(parts[0])
+    amount = int(parts[1])
+    data = load_data()
+    uid = str(target)
+    if uid not in data["users"]:
+        ensure_user(target)  # создадим
+        data = load_data()
+    if action == "add":
+        change_balance(uid, amount) if isinstance(uid,str) else change_balance(target, amount)
+        bot.send_message(m.chat.id, f"✅ Добавлено {amount} фишек пользователю {target}. Баланс: {get_balance(target)}")
+        try: bot.send_message(target, f"👑 Админ начислил вам {amount} фишек.")
+        except: pass
+        log_action(f"Admin {m.from_user.id} added {amount} to {target}")
+    else:  # remove
+        if get_balance(target) < amount:
+            return bot.send_message(m.chat.id, "У пользователя недостаточно фишек.")
+        change_balance(uid, -amount) if isinstance(uid,str) else change_balance(target, -amount)
+        bot.send_message(m.chat.id, f"✅ Снято {amount} фишек у пользователя {target}. Баланс: {get_balance(target)}")
+        try: bot.send_message(target, f"👑 Админ снял {amount} фишек с вашего баланса.")
+        except: pass
+        log_action(f"Admin {m.from_user.id} removed {amount} from {target}")
+
+# Обработчик для действий, где требуется только "<id>"
+def admin_handle_id_action(m: types.Message, action: str):
+    if m.from_user.id not in ADMINS:
+        return bot.send_message(m.chat.id, "🚫 Нет доступа.")
+    txt = (m.text or "").strip()
+    if not txt.isdigit():
+        return bot.send_message(m.chat.id, "Неверный ID. Введите только цифры.")
+    target = int(txt)
+    data = load_data()
+    uid = str(target)
+    # ensure user exists
+    if uid not in data["users"]:
+        ensure_user(target)
+
+    if action == "ban":
+        data["users"][uid]["banned"] = True
+        save_data(data)
+        bot.send_message(m.chat.id, f"🚫 Пользователь {target} забанен.")
+        try: bot.send_message(target, "🚫 Вы были забанены администратором.")
+        except: pass
+        log_action(f"Admin {m.from_user.id} banned {target}")
+
+    elif action == "unban":
+        data["users"][uid]["banned"] = False
+        save_data(data)
+        bot.send_message(m.chat.id, f"✅ Пользователь {target} разбанен.")
+        log_action(f"Admin {m.from_user.id} unbanned {target}")
+
+    elif action == "freeze":
+        data["users"][uid]["frozen"] = True
+        save_data(data)
+        bot.send_message(m.chat.id, f"❄️ Пользователь {target} заморожен.")
+        log_action(f"Admin {m.from_user.id} frozen {target}")
+
+    elif action == "unfreeze":
+        data["users"][uid]["frozen"] = False
+        save_data(data)
+        bot.send_message(m.chat.id, f"✅ Пользователь {target} разморожен.")
+        log_action(f"Admin {m.from_user.id} unfroze {target}")
+
+    elif action == "warn":
+        data["users"][uid].setdefault("warns", 0)
+        data["users"][uid]["warns"] += 1
+        save_data(data)
+        bot.send_message(m.chat.id, f"⚠️ Предупреждение пользователю {target}. Всего предупреждений: {data['users'][uid]['warns']}")
+        log_action(f"Admin {m.from_user.id} warned {target}")
+
+    elif action == "reset":
+        data["users"][uid]["balance"] = 0
+        save_data(data)
+        bot.send_message(m.chat.id, f"♻️ Баланс пользователя {target} обнулён.")
+        log_action(f"Admin {m.from_user.id} reset balance {target}")
 
     elif action == "balance":
-        bal = get_balance(uid)
-        bot.send_message(m.chat.id, f"💰 Баланс пользователя {uid}: {bal} фишек.")
+        bal = get_balance(target)
+        bot.send_message(m.chat.id, f"💰 Баланс {target}: {bal} фишек.")
+        log_action(f"Admin {m.from_user.id} checked balance {target}")
 
+    else:
+        bot.send_message(m.chat.id, "Неизвестное действие.")
 
-# Проверка перед любой игрой
-def can_play(uid):
-    data = load_data()
-    user = data["users"].get(str(uid), {})
-    if user.get("banned"):
-        return False, "🚫 Вы заблокированы."
-    if user.get("frozen"):
-        return False, "❄️ Ваш аккаунт заморожен."
-    return True, ""
+# --------------------------------------------------------------------
 
 # ====== ЗАПУСК ======
 if __name__ == "__main__":
