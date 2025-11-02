@@ -104,48 +104,55 @@ def group_casino(m):
 emojis = ["🍒", "🍋", "🍉", "🍇", "⭐", "7️⃣", "💎", "🍀"]
 
 @bot.message_handler(func=lambda m: m.text == "🎰 Слоты")
-def slots(message):
-    msg = bot.send_message(message.chat.id, "Введите сумму ставки (минимум 50):")
-    bot.register_next_step_handler(msg, slots_bet)
+def play_slots(message):
+    uid = str(message.from_user.id)
+    bot.send_message(uid, "💰 Введите ставку (минимум 50 фишек):")
+    bot.register_next_step_handler(message, process_slots_bet)
 
-def slots_bet(message):
-    uid = message.from_user.id
+def process_slots_bet(message):
+    uid = str(message.from_user.id)
     try:
-        bet = int(message.text)
-        if bet < 50:
-            bot.send_message(message.chat.id, "⚠️ Минимальная ставка — 50 фишек.")
-            return
-        if get_balance(uid) < bet:
-            bot.send_message(message.chat.id, "❌ Недостаточно фишек.")
-            return
-        msg = bot.send_message(message.chat.id, "🎰 Крутим барабаны...")
-        spin_slots(message.chat.id, msg.message_id, uid, bet)
+        amount = int(message.text)
     except ValueError:
-        bot.send_message(message.chat.id, "Введите число!")
+        bot.send_message(uid, "❌ Введите число!")
+        return
 
-def spin_slots(chat_id, msg_id, uid, bet):
-    for i in range(6):
-        board = [random.choice(emojis) for _ in range(3)]
-        text = f"🎰 <b>Крутим барабаны...</b>\n\n{board[0]} | {board[1]} | {board[2]}"
-        bot.edit_message_text(text, chat_id, msg_id, parse_mode="HTML")
-        time.sleep(0.4)
+    if amount < 50:
+        bot.send_message(uid, "❌ Минимальная ставка — 50 фишек.")
+        return
 
-    final = [random.choice(emojis) for _ in range(3)]
-    result = f"🎰 <b>Результат:</b>\n\n➡️ {final[0]} | {final[1]} | {final[2]}\n"
+    data = load_data()
+    if data["users"][uid]["balance"] < amount:
+        bot.send_message(uid, "❌ Недостаточно фишек!")
+        return
 
-# Проверяем комбинацию
-if final[0] == final[1] == final[2]:
-    win = amount * 10  # все три совпали
-    change_balance(uid, win)
-    result_text = f"🎉 Джекпот! Все три совпали! +{win} фишек"
-elif final[0] == final[1] or final[1] == final[2] or final[0] == final[2]:
-    win = amount * 2   # две совпали
-    change_balance(uid, win)
-    result_text = f"✨ Две совпали! +{win} фишек"
-else:
-    win = -amount
-    change_balance(uid, win)
-    result_text = f"😢 Не повезло. -{amount} фишек"
+    # 🎰 Анимация вращения
+    import random, time
+    slots = ["🍒", "🍋", "🍉", "🍇", "⭐", "7️⃣", "💎", "🍀"]
+    spin_message = bot.send_message(uid, "🎰 Вращаем барабаны...")
+    time.sleep(0.7)
+
+    final = []
+    for i in range(3):
+        roll = random.choice(slots)
+        final.append(roll)
+        bot.edit_message_text(f"🎰 {' '.join(final)}", uid, spin_message.message_id)
+        time.sleep(0.6)
+
+    # 💸 Проверка выигрыша
+    if final[0] == final[1] == final[2]:
+        win = amount * 10
+        data["users"][uid]["balance"] += win
+        bot.send_message(uid, f"🎉 Джекпот! {final[0]} {final[1]} {final[2]} +{win} фишек!")
+    elif final[0] == final[1] or final[1] == final[2] or final[0] == final[2]:
+        win = amount * 2
+        data["users"][uid]["balance"] += win
+        bot.send_message(uid, f"✨ Две совпали! {' '.join(final)} +{win} фишек!")
+    else:
+        data["users"][uid]["balance"] -= amount
+        bot.send_message(uid, f"😢 Не повезло. {' '.join(final)} -{amount} фишек.")
+
+    save_data(data)
 
 # ========================= 🎡 РУЛЕТКА =========================
 @bot.message_handler(func=lambda m: m.text == "🎡 Рулетка")
