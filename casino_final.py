@@ -566,4 +566,20 @@ def admin_status_action(m: types.Message, action: str):
 # ====== ЗАПУСК ======
 if __name__ == "__main__":
     print("✅ Бот запущен и слушает сообщения...")
+
+import threading
+import requests
+
+PING_URL = "https://casino-ruta.onrender.com"  # сюда вставь ссылку на Render (из Dashboard)
+
+def ping_self():
+    while True:
+        try:
+            requests.get(PING_URL)
+            print("🌐 Пинг отправлен — бот не уснёт!")
+        except Exception as e:
+            print("⚠️ Ошибка пинга:", e)
+        time.sleep(300)  # каждые 5 минут
+
+threading.Thread(target=ping_self, daemon=True).start()
     bot.infinity_polling(skip_pending=True)
