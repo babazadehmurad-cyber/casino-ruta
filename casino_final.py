@@ -11,18 +11,23 @@ MIN_BET = 50  # минимальная ставка
 TOKEN = "8509920661:AAF5-5hflC_ELoypc_By1HTOg3fgDXs8V1A"
 bot = telebot.TeleBot(TOKEN)
 
-# ========== ЗАГРУЗКА ДАННЫХ ==========
-try:
-    with open("data.json", "r") as f:
-        data = json.load(f)
-except:
-    data = {}
-
-if "users" not in data:
-    data["users"] = {}
-
 # ========== ФУНКЦИИ ==========
 DATA_FILE = "data.json"
+
+import json
+
+DATA_FILE = "data.json"
+
+def load_data():
+    try:
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {"users": {}}
+
+def save_data(data):
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f, indent=4)
 
 def load_data():
     if not os.path.exists(DATA_FILE):
