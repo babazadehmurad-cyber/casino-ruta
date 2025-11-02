@@ -40,12 +40,17 @@ def save_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-def ensure_user(user_id):
-    data = load_data()
-    if str(user_id) not in data["users"]:
-        data["users"][str(user_id)] = {"balance": 1000, "frozen": False, "banned": False}
+def ensure_user(uid, data):
+    if "users" not in data:
+        data["users"] = {}
+    if uid not in data["users"]:
+        data["users"][uid] = {
+            "balance": 1000,
+            "frozen": False,
+            "banned": False,
+            "logs": []
+        }
         save_data(data)
-    return data
 
 def get_balance(user_id):
     data = load_data()
