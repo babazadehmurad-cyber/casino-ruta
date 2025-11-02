@@ -121,159 +121,139 @@ def group_casino(m):
     )
     bot.send_message(m.chat.id, text, parse_mode="HTML", reply_markup=group_menu())
 
-# 🎰 — СЛОТЫ
-@bot.message_handler(func=lambda m: m.text == "🎰 Слоты")
-def slots_start(m):
-    bot.send_message(m.chat.id, "🎰 Введите сумму ставки (минимум 50):")
-    bot.register_next_step_handler(m, slots_play)
+# ✅ Безопасное обновление сообщений (исключает ошибку "message is not modified")
+def safe_edit_message(bot, chat_id, message_id, text):
+    try:
+        bot.edit_message_text(text, chat_id=chat_id, message_id=message_id)
+    except Exception as e:
+        if "message is not modified" in str(e):
+            pass
+        else:
+            print(f"⚠️ Ошибка при обновлении сообщения: {e}")
 
-def slots_play(m):
-    uid = str(m.from_user.id)
-    amount = m.text.strip()
-    data = load_data()
-    ensure_user(uid)
-
-    if not amount.isdigit():
-        bot.reply_to(m, "❌ Введите число.")
+# 🎰 СЛОТЫ
+def play_slots(bot, message, uid, username, amount, data):
+    symbols = ["🍒", "🍋", "🍉", "⭐", "🔔", "💎"]
+    if amount < 50:
+        bot.send_message(message.chat.id, "❗ Минимальная ставка — 50 фишек.")
         return
 
-    amount = int(amount)
-    if amount < MIN_BET:
-        bot.reply_to(m, f"Минимальная ставка — {MIN_BET} фишек.")
-        return
+    data[uid]["balance"] -= amount
+    save_data(data)
 
-    if data["users"][uid]["balance"] < amount:
-        bot.reply_to(m, "💸 Недостаточно фишек.")
-        return
+    msg = bot.send_message(message.chat.id, f"🎰 Казино Рута\nИгрок: {username}\n💰 Ставка: {amount}\n━━━━━━━━━━━━━━━\nВращаем барабаны...")
 
-    reels = ["🍒", "🍋", "🔔", "🍀", "⭐", "💎"]
-    msg = bot.send_message(m.chat.id, "🎰 Вращение...")
-    for _ in range(3):
-        spin = f"{random.choice(reels)} | {random.choice(reels)} | {random.choice(reels)}"
-        bot.edit_message_text(chat_id=m.chat.id, message_id=msg.message_id, text=f"🎰 {spin}")
-        time.sleep(0.5)
+    # Анимация вращения
+    for _ in range(5):
+        line = " | ".join(random.choices(symbols, k=3))
+        safe_edit_message(bot, message.chat.id, msg.message_id, f"🎰 Казино Рута\nИгрок: {username}\n💰 Ставка: {amount}\n━━━━━━━━━━━━━━━\n{line}\n━━━━━━━━━━━━━━━")
+        time.sleep(0.4)
 
-    final = [random.choice(reels) for _ in range(3)]
-    result = " | ".join(final)
-    win = final[0] == final[1] == final[2]
+    final = random.choices(symbols, k=3)
+    result_line = " | ".join(final)
 
-    if win:
-        prize = amount * 5
-        data["users"][uid]["balance"] += prize
-        text = f"🎉 {result}\nВы выиграли {prize} фишек!"
+    if final[0] == final[1] == final[2]:
+        win = amount * 5
+        data[uid]["balance"] += win
+        outcome = f"🔥 Джекпот! Вы выиграли {win} фишек!\nБаланс: {data[uid]['balance']}"
+    elif final[0] == final[1] or final[1] == final[2]:
+        win = amount * 2
+        data[uid]["balance"] += win
+        outcome = f"✨ Неплохо! Вы выиграли {win} фишек!\nБаланс: {data[uid]['balance']}"
     else:
-        data["users"][uid]["balance"] -= amount
-        text = f"{result}\n😢 Вы проиграли {amount} фишек."
+        outcome = f"😔 Не повезло. Потеря {amount} фишек.\nБаланс: {data[uid]['balance']}"
 
     save_data(data)
-    bot.edit_message_text(chat_id=m.chat.id, message_id=msg.message_id, text=f"🎰 {text}\n💰 Баланс: {data['users'][uid]['balance']}")
+    safe_edit_message(bot, message.chat.id, msg.message_id,
+                      f"🎰 Казино Рута\nИгрок: {username}\n💰 Ставка: {amount}\n━━━━━━━━━━━━━━━\n{result_line}\n━━━━━━━━━━━━━━━\n{outcome}")
 
+# 🎲 КОСТИ (игрок против казино)
+def play_dice(bot, message, uid, username, amount, data):
+    if amount < 50:
+        bot.send_message(message.chat.id, "❗ Минимальная ставка — 50 фишек.")
+        return
 
-# 🎡 — РУЛЕТКА
-@bot.message_handler(func=lambda msg: msg.text == "🎯 Рулетка")
-def roulette_start(message):
-    uid = str(message.from_user.id)
-    data = load_data()
-    ensure_user(uid, data)
+    data[uid]["balance"] -= amount
+    save_data(data)
 
-    bot.send_message(message.chat.id, "Введите сумму ставки (минимум 50):")
-    bot.register_next_step_handler(message, roulette_bet_step)
+    msg = bot.send_message(message.chat.id, f"🎲 Казино Рута\nИгрок: {username}\n💰 Ставка: {amount}\n━━━━━━━━━━━━━━━\nВы бросаете кости...")
 
-def roulette_bet_step(message):
-    uid = str(message.from_user.id)
-    data = load_data()
-    ensure_user(uid, data)
+    dice_faces = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
 
-    try:
-        bet = int(message.text)
-        if bet < 50:
-            return bot.send_message(message.chat.id, "Минимальная ставка — 50.")
-        if data["users"][uid]["balance"] < bet:
-            return bot.send_message(message.chat.id, "Недостаточно средств.")
+    # Анимация бросков игрока
+    for _ in range(3):
+        player_dice = f"{random.choice(dice_faces)} | {random.choice(dice_faces)}"
+        safe_edit_message(bot, message.chat.id, msg.message_id,
+                          f"🎲 Казино Рута\nИгрок: {username}\n💰 Ставка: {amount}\n━━━━━━━━━━━━━━━\nВы бросаете кости...\n{player_dice}\n━━━━━━━━━━━━━━━")
+        time.sleep(0.4)
 
-        data["users"][uid]["balance"] -= bet
-        save_data(data)
+    player_rolls = [random.randint(1, 6), random.randint(1, 6)]
+    player_sum = sum(player_rolls)
+    player_dice_final = f"{dice_faces[player_rolls[0]-1]} | {dice_faces[player_rolls[1]-1]}"
 
-        bot.send_message(message.chat.id, "🎯 Крутим рулетку...")
-        time.sleep(2)
+    safe_edit_message(bot, message.chat.id, msg.message_id,
+                      f"🎲 Казино Рута\nИгрок: {username}\n💰 Ставка: {amount}\n━━━━━━━━━━━━━━━\nВаш бросок:\n{player_dice_final} = {player_sum}\n━━━━━━━━━━━━━━━\nКазино бросает кости...")
 
-        sectors = ["❤️ Красное", "🖤 Чёрное", "💚 Зеро"]
-        spin = random.choice(sectors)
-        bot.send_message(message.chat.id, f"Рулетка остановилась на: {spin}")
+    # Анимация казино
+    time.sleep(1)
+    for _ in range(3):
+        casino_dice = f"{random.choice(dice_faces)} | {random.choice(dice_faces)}"
+        safe_edit_message(bot, message.chat.id, msg.message_id,
+                          f"🎲 Казино Рута\nИгрок: {username}\n💰 Ставка: {amount}\n━━━━━━━━━━━━━━━\nКазино бросает кости...\n{casino_dice}\n━━━━━━━━━━━━━━━")
+        time.sleep(0.4)
 
-        if spin == "❤️ Красное":
-            win = bet * 2
-            data["users"][uid]["balance"] += win
-            bot.send_message(message.chat.id, f"Поздравляем! Вы выиграли {win}!")
-        elif spin == "💚 Зеро":
-            win = bet * 5
-            data["users"][uid]["balance"] += win
-            bot.send_message(message.chat.id, f"💚 ЗЕРО! Вы выиграли {win}!")
-        else:
-            bot.send_message(message.chat.id, "Увы, вы проиграли 😔")
+    casino_rolls = [random.randint(1, 6), random.randint(1, 6)]
+    casino_sum = sum(casino_rolls)
+    casino_dice_final = f"{dice_faces[casino_rolls[0]-1]} | {dice_faces[casino_rolls[1]-1]}"
 
-        save_data(data)
-    except ValueError:
-        bot.send_message(message.chat.id, "Введите сумму числом.")
+    if player_sum > casino_sum:
+        win = amount * 2
+        data[uid]["balance"] += win
+        outcome = f"🔥 Вы победили!\n+{win} фишек\nБаланс: {data[uid]['balance']}"
+    elif player_sum == casino_sum:
+        data[uid]["balance"] += amount
+        outcome = f"🤝 Ничья!\nВозврат {amount} фишек\nБаланс: {data[uid]['balance']}"
+    else:
+        outcome = f"😔 Проигрыш.\n-{amount} фишек\nБаланс: {data[uid]['balance']}"
 
-# ========================= 🎲 КОСТИ =========================
-@bot.message_handler(func=lambda msg: msg.text == "🎲 Кости")
-def dice_game(message):
-    uid = str(message.from_user.id)
-    data = load_data()
-    ensure_user(uid, data)
+    save_data(data)
+    safe_edit_message(bot, message.chat.id, msg.message_id,
+                      f"🎲 Казино Рута\nИгрок: {username}\n💰 Ставка: {amount}\n━━━━━━━━━━━━━━━\nВаш результат: {player_dice_final} = {player_sum}\nКазино: {casino_dice_final} = {casino_sum}\n━━━━━━━━━━━━━━━\n{outcome}")
 
-    bot.send_message(message.chat.id, "Введите сумму ставки (минимум 50):")
-    bot.register_next_step_handler(message, dice_bet_step)
+# 🎡 РУЛЕТКА
+def play_roulette(bot, message, uid, username, amount, data):
+    if amount < 50:
+        bot.send_message(message.chat.id, "❗ Минимальная ставка — 50 фишек.")
+        return
 
-def dice_bet_step(message):
-    uid = str(message.from_user.id)
-    data = load_data()
-    ensure_user(uid, data)
+    data[uid]["balance"] -= amount
+    save_data(data)
 
-    try:
-        bet = int(message.text)
-        if bet < 50:
-            return bot.send_message(message.chat.id, "Минимальная ставка — 50 🎲")
-        if data["users"][uid]["balance"] < bet:
-            return bot.send_message(message.chat.id, "Недостаточно средств 💸")
+    msg = bot.send_message(message.chat.id, f"🎡 Казино Рута\nИгрок: {username}\n💰 Ставка: {amount}\n━━━━━━━━━━━━━━━\nВращаем рулетку...")
 
-        data["users"][uid]["balance"] -= bet
-        save_data(data)
+    numbers = list(range(0, 37))
+    for _ in range(8):
+        spin_number = random.choice(numbers)
+        safe_edit_message(bot, message.chat.id, msg.message_id,
+                          f"🎡 Казино Рута\nИгрок: {username}\n💰 Ставка: {amount}\n━━━━━━━━━━━━━━━\nШарик крутится...\n🎯 {spin_number}\n━━━━━━━━━━━━━━━")
+        time.sleep(0.3)
 
-        bot.send_message(message.chat.id, "🎲 Бросаем кости...")
-        time.sleep(1.0)
+    result = random.randint(0, 36)
+    color = "🟥" if result % 2 == 0 else "⬛"
+    win = 0
 
-        # Анимация броска (перелистывание эмодзи)
-        animation = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
-        msg = bot.send_message(message.chat.id, "⚀")
-        for i in range(6):
-            time.sleep(0.25)
-            bot.edit_message_text(animation[i % 6], message.chat.id, msg.message_id)
+    if result == 0:
+        outcome = f"🟢 Зеро! Казино забирает ставку.\nБаланс: {data[uid]['balance']}"
+    elif result % 2 == 0:
+        win = amount * 2
+        data[uid]["balance"] += win
+        outcome = f"🟥 Красное! Вы выиграли {win} фишек 💰\nБаланс: {data[uid]['balance']}"
+    else:
+        outcome = f"⬛ Чёрное! Вы проиграли {amount} фишек 😔\nБаланс: {data[uid]['balance']}"
 
-        # Выпавшие значения
-        user_roll = random.randint(1, 6)
-        bot_roll = random.randint(1, 6)
-        time.sleep(0.5)
-        bot.edit_message_text(f"Вы бросили: {animation[user_roll - 1]}", message.chat.id, msg.message_id)
-        time.sleep(1.2)
-        bot.send_message(message.chat.id, f"Бот бросил: {animation[bot_roll - 1]}")
-
-        # Подсчёт результата
-        if user_roll > bot_roll:
-            win = bet * 2
-            data["users"][uid]["balance"] += win
-            bot.send_message(message.chat.id, f"Вы победили! 🥳 +{win} на баланс 💰")
-        elif user_roll == bot_roll:
-            data["users"][uid]["balance"] += bet
-            bot.send_message(message.chat.id, "Ничья 🤝 Ваша ставка возвращена!")
-        else:
-            bot.send_message(message.chat.id, "Вы проиграли 😔")
-
-        save_data(data)
-
-    except ValueError:
-        bot.send_message(message.chat.id, "Введите сумму числом 💬")
+    save_data(data)
+    safe_edit_message(bot, message.chat.id, msg.message_id,
+                      f"🎡 Казино Рута\nИгрок: {username}\n💰 Ставка: {amount}\n━━━━━━━━━━━━━━━\nВыпало число {result} {color}\n━━━━━━━━━━━━━━━\n{outcome}")
 
 # ========== БОНУС ==========
 @bot.message_handler(func=lambda m: m.text == "🎁 Бонус")
