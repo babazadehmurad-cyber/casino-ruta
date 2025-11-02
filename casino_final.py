@@ -76,7 +76,7 @@ def main_menu():
 def cmd_start(m):
     uid = m.from_user.id
     username = m.from_user.username or m.from_user.first_name
-    ensure_user(uid, username)
+    ensure_user(uid, data)
 
     text = (
         "💎━━━━━━━━━━━━━━━━━━━━━━💎\n"
