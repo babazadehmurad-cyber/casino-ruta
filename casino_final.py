@@ -164,7 +164,7 @@ def roulette_start(m: types.Message):
     # проверка баланса/статуса (предполагается, что есть can_play, ensure_user)
     ensure_user(uid)
     ok, reason = can_play(uid)
-    if not ok
+    if not ok:
         bot.send_message(m.chat.id, reason)
         return
 
